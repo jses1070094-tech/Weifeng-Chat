@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weifeng Chat - 微風 AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsencrypt/3.3.2/jsencrypt.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --primary-neon: #3b82f6;
+            --success-neon: #10b981;
+            --ai-neon: #06b6d4;
+        }
+
+        body { 
+            background: radial-gradient(circle at top, #1e293b 0%, var(--bg-color) 70%);
+            font-family: 'Noto Sans TC', sans-serif; 
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* 標題特效 */
+        .brand-title {
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(96, 165, 250, 0.2);
+        }
+
+        /* 卡片毛玻璃優化 */
+        .card { 
+            background: var(--card-bg); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border); 
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        /* 導覽籤客製化 */
+        .nav-tabs { border-bottom: 1px solid var(--card-border); }
+        .nav-tabs .nav-link {
+            color: var(--text-muted);
+            border: none;
+            padding: 12px 20px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .nav-tabs .nav-link:hover { color: var(--text-main); }
+        .nav-tabs .nav-link.active {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-bottom: 3px solid var(--primary-neon);
+            border-radius: 8px 8px 0 0;
+        }
+
+        /* 聊天盒調教 */
+        .chat-box { 
+            height: 400px; 
+            overflow-y: auto; 
+            background: rgba(15, 23, 42, 0.6); 
+            border: 1px solid var(--card-border); 
+            padding: 20px; 
+            border-radius: 12px; 
+        }
+
+        /* 訊息氣泡美化 */
+        .msg-item { 
+            margin-bottom: 16px; 
+            padding: 10px 16px; 
+            border-radius: 14px; 
+            max-width: 75%; 
+            font-size: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .msg-in { 
+            background-color: #1e293b; 
+            color: #e2e8f0;
+            float: left; 
+            clear: both; 
+            border-bottom-left-radius: 4px;
+        }
+        .msg-out { 
+            background: linear-gradient(135deg, #059669, #10b981); 
+            color: #fff;
+            float: right; 
+            clear: both; 
+            border-bottom-right-radius: 4px;
+        }
+        .msg-ai { 
+            background: rgba(6, 182, 212, 0.1); 
+            color: #e0f7fa;
+            float: left; 
+            clear: both; 
+            border-left: 4px solid var(--ai-neon); 
+            border-radius: 4px 14px 14px 14px;
+        }
+
+        /* 表單元件美化 */
+        .form-control {
+            background-color: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--card-border);
+            color: #fff;
+            border-radius: 8px;
+            padding: 10px 14px;
+        }
+        .form-control:focus {
+            background-color: #0f172a;
+            border-color: var(--primary-neon);
+            color: #fff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        /* 密鑰專用區塊 */
+        .secret-key { 
+            background-color: #090d16; 
+            font-family: 'JetBrains Mono', monospace; 
+            color: #34d399;
+            white-space: pre-wrap; 
+            word-break: break-all; 
+            max-height: 180px; 
+            overflow-y: auto; 
+            border: 1px dashed rgba(52, 211, 153, 0.3);
+            font-size: 13px;
+        }
+
+        .btn { border-radius: 8px; padding: 10px 16px; font-weight: 500; transition: all 0.2s; }
+        .btn-primary { background-color: var(--primary-neon); border: none; }
+        .btn-primary:hover { background-color: #2563eb; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container py-5" style="max-width: 950px;">
+    <div class="text-center mb-5">
+        <h1 class="brand-title display-5 mb-2">🔒 Weifeng Chat</h1>
+        <p class="text-secondary fs-5">安全私訊 | 多人群組 | Weifeng AI 智慧助手</p>
+    </div>
+
+    <div id="alert-box" class="alert alert-info hidden text-center mb-4 border-0 shadow-sm"></div>
+
+    <div id="auth-section" class="card p-4 p-md-5" style="max-width: 480px; margin: 0 auto;">
+        <h3 class="mb-4 text-center fw-bold">帳號認證</h3>
+        <div class="d-flex justify-content-center mb-4">
+            <div class="btn-group w-100 p-1 bg-dark rounded-3" style="max-width: 240px;">
+                <input type="radio" class="btn-check" name="authMode" id="mode-login" checked>
+                <label class="btn btn-outline-light border-0 py-2 w-50" for="mode-login">登入</label>
+                <input type="radio" class="btn-check" name="authMode" id="mode-register">
+                <label class="btn btn-outline-light border-0 py-2 w-50" for="mode-register">註冊</label>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-light fs-7">電子信箱 Email</label>
+            <input type="email" id="auth-email" class="form-control" placeholder="name@example.com">
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-light">帳號密碼 (至少6碼)</label>
+            <input type="password" id="auth-password" class="form-control" placeholder="••••••••">
+        </div>
+        <div id="private-key-input-group" class="mb-4">
+            <label class="form-label text-warning">🔑 導入您的「私鑰 (PEM)」以解密私訊 (選填)</label>
+            <textarea id="login-private-key" class="form-control" rows="3" placeholder="-----BEGIN PRIVATE KEY-----&#10;..."></textarea>
+        </div>
+        <button id="btn-submit-auth" class="btn btn-primary w-100 mb-3 fs-6">🔓 驗證並進入終端</button>
+        <div class="position-relative my-4 text-center">
+            <hr class="text-secondary">
+            <span class="position-absolute top-50 start-50 translate-middle bg-dark px-3 text-muted style='font-size:12px'">或</span>
+        </div>
+        <button id="btn-google-auth" class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-google" viewBox="0 0 16 16"><path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0c2.158 0 4 .799 5.39 2.045l-2.235 2.235C10.24 3.413 9.22 3 8 3c-2.427 0-4.4 1.973-4.4 4.4s1.973 4.4 4.4 4.4c2.73 0 3.73-1.95 3.896-2.95H8V6.558h7.545z"/></svg>
+            使用 Google 帳號快速登入
+        </button>
+    </div>
+
+    <div id="verify-section" class="card p-5 text-center hidden" style="max-width: 500px; margin: 0 auto;">
+        <h3 class="text-warning mb-3 fw-bold">📧 請驗證您的電子郵件</h3>
+        <p class="text-secondary mb-4">我們已發送驗證信至：<br><strong id="verify-email-display" class="text-info"></strong><br>請先前往信箱點擊連結後，再點擊下方按鈕。</p>
+        <button id="btn-check-verified" class="btn btn-success w-100 mb-3">✅ 我已完成驗證，開通帳號</button>
+        <button id="btn-cancel-verify" class="btn btn-link text-secondary w-100 text-decoration-none">返回登入</button>
+    </div>
+
+    <div id="main-section" class="hidden">
+        <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-dark bg-opacity-50 rounded-3 border border-secondary border-opacity-25 shadow-sm">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-success p-2 rounded-circle d-inline-block" style="width:10px; height:10px;"></span>
+                <span>當前使用者：<strong id="user-display-email" class="text-info"></strong></span>
+            </div>
+            <button id="btn-logout" class="btn btn-sm btn-outline-danger">🚪 安全登出</button>
+        </div>
+
+        <ul class="nav nav-tabs mb-4 gap-1" id="mainTabs">
+            <li class="nav-item">
+                <button class="nav-link active" id="tab-ai" data-bs-toggle="tab" data-bs-target="#panel-ai" type="button">🤖 Weifeng AI 智慧助手</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tab-group" data-bs-toggle="tab" data-bs-target="#panel-group" type="button">👥 公開大群組</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tab-pm" data-bs-toggle="tab" data-bs-target="#panel-pm" type="button">🔒 密鑰私訊 (E2EE)</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="tab-key" data-bs-toggle="tab" data-bs-target="#panel-key" type="button">🔑 備份私鑰</button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active card p-4" id="panel-ai">
+                <h4 class="mb-3 fw-bold text-info">🤖 Weifeng AI 智慧對話</h4>
+                <div class="chat-box mb-3" id="chat-ai-box">
+                    <div class="msg-item msg-ai">你好！我是你的 Weifeng AI 助理，有什麼我可以幫忙的嗎？</div>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="input-ai-msg" class="form-control" placeholder="輸入您的提問...">
+                    <button id="btn-send-ai" class="btn btn-info text-white px-4">問問 AI</button>
+                </div>
+            </div>
+
+            <div class="tab-pane fade card p-4" id="panel-group">
+                <h4 class="mb-3 fw-bold text-primary">👥 公開大群組聊天室</h4>
+                <div class="chat-box mb-3" id="chat-group-box"></div>
+                <div class="input-group">
+                    <input type="text" id="input-group-msg" class="form-control" placeholder="發送公開群組訊息...">
+                    <button id="btn-send-group" class="btn btn-primary px-4">發送</button>
+                </div>
+            </div>
+
+            <div class="tab-pane fade card p-4" id="panel-pm">
+                <h4 class="mb-3 fw-bold text-success">🔒 安全加密私訊 (端到端加密)</h4>
+                <div class="mb-3">
+                    <label class="form-label text-secondary">收件者 Email 地址</label>
+                    <input type="email" id="pm-target-email" class="form-control" placeholder="friend@mail.com">
+                </div>
+                <div class="chat-box mb-3" id="chat-pm-box"></div>
+                <div class="input-group">
+                    <input type="text" id="input-pm-msg" class="form-control" placeholder="輸入私密訊息，自動端到端加密...">
+                    <button id="btn-send-pm" class="btn btn-success px-4">加密發送</button>
+                </div>
+            </div>
+
+            <div class="tab-pane fade card p-4" id="panel-key">
+                <h4 class="text-danger mb-3 fw-bold">⚠️ 私密金鑰管理安全警告</h4>
+                <p class="text-secondary small">本系統採用極高強度的端到端非對稱加密技術。如果您未在此瀏覽器緩存或提供私鑰，您將完全無法解密與閱讀他人傳送給您的私密訊息。請妥善備份。</p>
+                <div id="backup-private-key" class="secret-key p-3 rounded-3 mb-3"></div>
+                <button id="btn-download-key" class="btn btn-outline-success d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v2.5a.5.5 0 0 1-1 0v-2.5a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v2.5a.5.5 0 0 1-.5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                    下載私鑰安全備份 (.txt)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, reload, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, getDocs, collection, query, where, addDoc, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 📋 已自動填入你的 Firebase 配置
+    const firebaseConfig = {
+        apiKey: "AIzaSyBMxdzzFR7wuocXEMOYciw2PPJleuRevOw",
+        authDomain: "weifengai-ef11f.firebaseapp.com",
+        projectId: "weifengai-ef11f",
+        storageBucket: "weifengai-ef11f.firebasestorage.app",
+        messagingSenderId: "474059699642",
+        appId: "1:474059699642:web:b40a3d32be1cd583199983",
+        measurementId: "G-N1TYXP9EWQ"
+    };
+
+    // 🧠 已自動填入你的 Gemini AI 金鑰
+    const GEMINI_API_KEY = "AIzaSyATX9erM04VfUR_N0io0hwA51XA9IiYf4s";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    let localPrivateKey = "";
+    let currentUserUid = "";
+    let currentUserEmail = "";
+
+    const authSection = document.getElementById('auth-section');
+    const verifySection = document.getElementById('verify-section');
+    const mainSection = document.getElementById('main-section');
+    const modeLogin = document.getElementById('mode-login');
+    const modeRegister = document.getElementById('mode-register');
+    const privateKeyGroup = document.getElementById('private-key-input-group');
+    const btnSubmitAuth = document.getElementById('btn-submit-auth');
+    const alertBox = document.getElementById('alert-box');
+
+    modeLogin.addEventListener('change', () => { privateKeyGroup.classList.remove('hidden'); });
+    modeRegister.addEventListener('change', () => { privateKeyGroup.classList.add('hidden'); });
+    function showAlert(msg, type="info") { alertBox.className = `alert alert-${type} text-center`; alertBox.innerText = msg; alertBox.classList.remove('hidden'); }
+    function hideAlert() { alertBox.classList.add('hidden'); }
+
+    // Google 快速登入邏輯
+    document.getElementById('btn-google-auth').addEventListener('click', async () => {
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            const user = result.user;
+            
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            if (!userDoc.exists()) {
+                const crypt = new JSEncrypt({ default_key_size: 2048 });
+                crypt.getKey();
+                localPrivateKey = crypt.getPrivateKey();
+                await setDoc(doc(db, "users", user.uid), { email: user.email, public_key: crypt.getPublicKey() });
+                alert("🎉 Google 首次登入成功！已為您生成端到端加密金鑰，請至備份分頁下載。");
+            }
+            hideAlert();
+            enterMain(user.uid, user.email);
+        } catch (e) {
+            alert("Google 登入失敗: " + e.message);
+        }
+    });
+
+    // Email 註冊/登入邏輯
+    btnSubmitAuth.addEventListener('click', async () => {
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value.trim();
+        if(!email || password.length < 6) { alert("請填入正確的 Email 與至少 6 碼密碼"); return; }
+
+        if (modeRegister.checked) {
+            try {
+                btnSubmitAuth.disabled = true;
+                const userCred = await createUserWithEmailAndPassword(auth, email, password);
+                await sendEmailVerification(userCred.user);
+                document.getElementById('verify-email-display').innerText = email;
+                authSection.classList.add('hidden');
+                verifySection.classList.remove('hidden');
+                showAlert("驗證郵件已發送，請至信箱點擊連結！", "warning");
+            } catch (e) { alert("註冊失敗: " + e.message); }
+            finally { btnSubmitAuth.disabled = false; }
+        } else {
+            const inputKey = document.getElementById('login-private-key').value.trim();
+            try {
+                btnSubmitAuth.disabled = true;
+                const userCred = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCred.user;
+
+                if (!user.emailVerified) {
+                    document.getElementById('verify-email-display').innerText = user.email;
+                    authSection.classList.add('hidden');
+                    verifySection.classList.remove('hidden');
+                    showAlert("帳號尚未通過電子郵件驗證！", "danger");
+                    return;
+                }
+
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (!userDoc.exists()) {
+                    const crypt = new JSEncrypt({ default_key_size: 2048 });
+                    crypt.getKey();
+                    localPrivateKey = crypt.getPrivateKey();
+                    await setDoc(doc(db, "users", user.uid), { email: user.email, public_key: crypt.getPublicKey() });
+                } else {
+                    localPrivateKey = inputKey;
+                }
+
+                hideAlert();
+                enterMain(user.uid, user.email);
+            } catch (e) { alert("登入失敗: " + e.message); }
+            finally { btnSubmitAuth.disabled = false; }
+        }
+    });
+
+    document.getElementById('btn-check-verified').addEventListener('click', async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+        await reload(user);
+        if (user.emailVerified) {
+            const crypt = new JSEncrypt({ default_key_size: 2048 });
+            crypt.getKey();
+            localPrivateKey = crypt.getPrivateKey();
+            await setDoc(doc(db, "users", user.uid), { email: user.email, public_key: crypt.getPublicKey() });
+            
+            verifySection.classList.add('hidden');
+            hideAlert();
+            enterMain(user.uid, user.email);
+            alert("驗證開通成功！已自動生成端到端加密金鑰，請至備份分頁下載。");
+        } else {
+            alert("系統偵測到您尚未點擊信中的驗證連結。");
+        }
+    });
+
+    document.getElementById('btn-cancel-verify').addEventListener('click', () => { signOut(auth); location.reload(); });
+    document.getElementById('btn-logout').addEventListener('click', () => { signOut(auth); location.reload(); });
+
+    function enterMain(uid, email) {
+        currentUserUid = uid;
+        currentUserEmail = email;
+        document.getElementById('user-display-email').innerText = email;
+        authSection.classList.add('hidden');
+        mainSection.classList.remove('hidden');
+        document.getElementById('backup-private-key').innerText = localPrivateKey || "（未提供私鑰，無法解密私訊）";
+        
+        startGroupChatListener();
+        startPMChatListener();
+    }
+
+    // ================= Weifeng AI 智慧對話 =================
+    document.getElementById('btn-send-ai').addEventListener('click', async () => {
+        const inputEl = document.getElementById('input-ai-msg');
+        const prompt = inputEl.value.trim();
+        if (!prompt) return;
+
+        const aiBox = document.getElementById('chat-ai-box');
+        aiBox.innerHTML += `<div class="msg-item msg-out">${prompt}</div>`;
+        inputEl.value = "";
+        aiBox.scrollTop = aiBox.scrollHeight;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            const data = await response.json();
+            const aiText = data.candidates[0].content.parts[0].text;
+            aiBox.innerHTML += `<div class="msg-item msg-ai">🤖 ${aiText}</div>`;
+        } catch (e) {
+            aiBox.innerHTML += `<div class="msg-item msg-ai text-danger">🤖 思考錯誤：請檢查金鑰或網路連線。</div>`;
+        }
+        aiBox.scrollTop = aiBox.scrollHeight;
+    });
+
+    // ================= 群組聊天室 =================
+    function startGroupChatListener() {
+        const q = query(collection(db, "group_messages"), orderBy("timestamp", "asc"));
+        onSnapshot(q, (snapshot) => {
+            const box = document.getElementById('chat-group-box');
+            box.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const isMe = data.sender === currentUserEmail;
+                box.innerHTML += `
+                    <div class="msg-item ${isMe ? 'msg-out' : 'msg-in'}">
+                        <small class="text-secondary d-block mb-1" style="font-size:11px; opacity: 0.8;">${data.sender}</small>
+                        ${data.text}
+                    </div>`;
+            });
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    document.getElementById('btn-send-group').addEventListener('click', async () => {
+        const input = document.getElementById('input-group-msg');
+        const text = input.value.trim();
+        if (!text) return;
+        await addDoc(collection(db, "group_messages"), { sender: currentUserEmail, text: text, timestamp: Date.now() });
+        input.value = "";
+    });
+
+    // ================= 端到端私訊加解密 =================
+    function encryptMessage(message, receiverPublicKeyPem) {
+        const aesKey = CryptoJS.lib.WordArray.random(32);
+        const iv = CryptoJS.lib.WordArray.random(16);
+        const encrypted = CryptoJS.AES.encrypt(message, aesKey, { iv: iv, mode: CryptoJS.mode.CFB, padding: CryptoJS.pad.NoPadding });
+        const encryptedTextBytes = CryptoJS.enc.Base64.parse(encrypted.toString());
+
+        const encryptor = new JSEncrypt();
+        encryptor.setPublicKey(receiverPublicKeyPem);
+        const encryptedAesKeyStr = encryptor.encrypt(CryptoJS.enc.Hex.stringify(aesKey)); 
+        const encryptedAesKeyBytes = CryptoJS.enc.Base64.parse(encryptedAesKeyStr);
+
+        return CryptoJS.enc.Base64.stringify(iv.clone().concat(encryptedAesKeyBytes).concat(encryptedTextBytes));
+    }
+
+    function decryptMessage(cipherPackageBase64, myPrivateKeyPem) {
+        if (!myPrivateKeyPem) throw new Error();
+        const combinedHex = CryptoJS.enc.Hex.stringify(CryptoJS.enc.Base64.parse(cipherPackageBase64));
+        const ivHex = combinedHex.substring(0, 32);
+        const encAesKeyHex = combinedHex.substring(32, 32 + 512);
+        const encTextHex = combinedHex.substring(32 + 512);
+
+        const decryptor = new JSEncrypt();
+        decryptor.setPrivateKey(myPrivateKeyPem);
+        const decryptedAesKeyHex = decryptor.decrypt(CryptoJS.enc.Base64.stringify(CryptoJS.enc.Hex.parse(encAesKeyHex)));
+        if(!decryptedAesKeyHex) throw new Error();
+
+        const decrypted = CryptoJS.AES.decrypt(CryptoJS.enc.Base64.stringify(CryptoJS.enc.Hex.parse(encTextHex)), CryptoJS.enc.Hex.parse(decryptedAesKeyHex), { iv: CryptoJS.enc.Hex.parse(ivHex), mode: CryptoJS.mode.CFB, padding: CryptoJS.pad.NoPadding });
+        return decrypted.toString(CryptoJS.enc.Utf8);
+    }
+
+    // 安全防禦 XSS 輔助
+    function escapeHtml(str) {
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function startPMChatListener() {
+        const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
+        onSnapshot(q, (snapshot) => {
+            const box = document.getElementById('chat-pm-box');
+            box.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.sender_email === currentUserEmail || data.receiver_uid === currentUserUid) {
+                    const isMe = data.sender_email === currentUserEmail;
+                    let displayMsg = "";
+                    try {
+                        let decrypted = decryptMessage(data.encrypted_text, localPrivateKey);
+                        displayMsg = isMe ? `🔒 (已加密送出) <br> <span class="text-light" style="font-size:12px; opacity:0.6;">原始明文：${escapeHtml(decrypted)}</span>` : escapeHtml(decrypted);
+                    } catch(e) {
+                        displayMsg = "<span class='text-danger'>❌ 無法解密 (請於金鑰管理中提供正確私鑰)</span>";
+                    }
+                    box.innerHTML += `
+                        <div class="msg-item ${isMe ? 'msg-out' : 'msg-in'}">
+                            <small class="text-secondary d-block mb-1" style="font-size:10px; opacity:0.7;">${data.sender_email}</small>
+                            ${displayMsg}
+                        </div>`;
+                }
+            });
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    document.getElementById('btn-send-pm').addEventListener('click', async () => {
+        const targetEmail = document.getElementById('pm-target-email').value.trim();
+        const input = document.getElementById('input-pm-msg');
+        const text = input.value.trim();
+        if (!targetEmail || !text) return;
+
+        const q = query(collection(db, "users"), where("email", "==", targetEmail));
+        const snapshot = await getDocs(q);
+        let targetUid = null, targetPubKey = null;
+        snapshot.forEach((doc) => { targetUid = doc.id; targetPubKey = doc.data().public_key; });
+
+        if (!targetPubKey) { alert("找不到該使用者的公鑰，對方可能尚未註冊或驗證！"); return; }
+
+        const encPack = encryptMessage(text, targetPubKey);
+        await addDoc(collection(db, "messages"), {
+            sender_email: currentUserEmail,
+            receiver_uid: targetUid,
+            encrypted_text: encPack,
+            timestamp: Date.now()
+        });
+        input.value = "";
+    });
+
+    document.getElementById('btn-download-key').addEventListener('click', () => {
+        if(!localPrivateKey) return;
+        const blob = new Blob([localPrivateKey], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = "ciphertalk_private_key.txt"; a.click();
+        URL.revokeObjectURL(url);
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
