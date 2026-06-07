@@ -156,7 +156,7 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getDatabase, ref, set, get, push, onValue, query as dbQuery, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase 配置
+    // Firebase 配置 (已自動補上缺少的 databaseURL !)
     const firebaseConfig = {
         apiKey: "AIzaSyBMxdzzFR7wuocXEMOYciw2PPJleuRevOw",
         authDomain: "weifengai-ef11f.firebaseapp.com",
@@ -205,7 +205,6 @@
         return email.replace(/\./g, '_');
     }
 
-    // 驗證與註冊分流
     btnSubmitAuth.addEventListener('click', async () => {
         const email = document.getElementById('auth-email').value.trim();
         const password = document.getElementById('auth-password').value.trim();
@@ -226,7 +225,11 @@
                 authSection.classList.add('hidden');
                 verifySection.classList.remove('hidden');
                 showAlert("🔢 6 位數驗證碼已發送至您的信箱，請查看輸入！", "warning");
-            } catch (e) { alert("發送失敗: " + e.message); }
+            } catch (e) { 
+                // 強大防呆：如果報錯，同時檢查 e.message、e.text 甚至整個 e 的 JSON，找出底層原因
+                let errorDetails = e.message || e.text || (typeof e === 'object' ? JSON.stringify(e) : e);
+                alert("發送失敗: " + errorDetails); 
+            }
             finally { btnSubmitAuth.disabled = false; }
         } else {
             const inputKey = document.getElementById('login-private-key').value.trim();
@@ -241,7 +244,6 @@
         }
     });
 
-    // 比對 6 位數驗證碼
     document.getElementById('btn-check-code').addEventListener('click', async () => {
         const inputCode = document.getElementById('input-verify-code').value.trim();
         if(inputCode.length !== 6) { alert("請輸入完整的 6 位數驗證碼。"); return; }
@@ -268,7 +270,7 @@
                 alert("❌ 驗證碼錯誤，請重新確認郵件！");
             }
         } catch(e) {
-            alert("驗證處理失敗: " + e.message);
+            alert("驗證處理失敗: " + (e.message || JSON.stringify(e)));
         }
     });
 
@@ -382,7 +384,7 @@
             await set(newPmRef, { sender_email: currentUserEmail, receiver_uid: targetUid, encrypted_text: encPack, timestamp: Date.now() }); 
             input.value = "";
         } catch(e) {
-            alert("發送失敗: " + e.message);
+            alert("發送失敗: " + (e.message || JSON.stringify(e)));
         }
     });
     document.getElementById('btn-download-key').addEventListener('click', () => {
