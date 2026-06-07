@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsencrypt/3.3.2/jsencrypt.min.js"></script>
+    <!-- 引入 EmailJS 免費發信套件 -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     
     <style>
@@ -55,6 +56,7 @@
 
     <div id="alert-box" class="alert hidden text-center mb-4 card-glass border-0 py-3 fw-medium"></div>
 
+    <!-- 1. 登入註冊介面 -->
     <div id="auth-section" class="card-glass p-4 p-md-5" style="max-width: 460px; margin: 0 auto;">
         <h3 class="mb-4 text-center fw-bold">帳號認證</h3>
         <div class="d-flex justify-content-center mb-4">
@@ -80,6 +82,7 @@
         <button id="btn-submit-auth" class="btn btn-breeze w-100 mb-3">🔓 驗證並進入終端</button>
     </div>
 
+    <!-- 2. 6 位數驗證碼輸入介面 -->
     <div id="verify-section" class="card-glass p-4 p-md-5 text-center hidden" style="max-width: 460px; margin: 0 auto;">
         <h3 class="text-warning mb-3 fw-bold">🔢 輸入 6 位數驗證碼</h3>
         <p class="text-secondary mb-4">我們已向您的電子信箱發送了安全驗證碼，請在下方輸入：</p>
@@ -90,6 +93,7 @@
         <button id="btn-cancel-verify" class="btn btn-link text-secondary w-100 text-decoration-none fs-7">返回修改信箱</button>
     </div>
 
+    <!-- 3. 主通訊控制面板 -->
     <div id="main-section" class="hidden">
         <div class="d-flex justify-content-between align-items-center mb-4 p-3 card-glass rounded-3">
             <div class="fs-7">🍃 當前終端：<strong id="user-display-email" class="text-info"></strong></div>
@@ -104,6 +108,7 @@
         </ul>
 
         <div class="tab-content">
+            <!-- AI 分頁 -->
             <div class="tab-pane fade show active card-glass p-4" id="panel-ai">
                 <h4 class="mb-3 fw-bold text-info fs-5">🤖 微風 AI 智慧對話</h4>
                 <div class="chat-container mb-3" id="chat-ai-box">
@@ -114,6 +119,7 @@
                     <button id="btn-send-ai" class="btn btn-breeze px-4">問問 AI</button>
                 </div>
             </div>
+            <!-- 公開群組 -->
             <div class="tab-pane fade card-glass p-4" id="panel-group">
                 <h4 class="mb-3 fw-bold text-primary fs-5" style="color: var(--breeze-blue) !important;">👥 公開大群組聊天室</h4>
                 <div class="chat-container mb-3" id="chat-group-box"></div>
@@ -122,6 +128,7 @@
                     <button id="btn-send-group" class="btn btn-breeze px-4" style="background: linear-gradient(135deg, var(--breeze-blue), #1d4ed8);">發送</button>
                 </div>
             </div>
+            <!-- 加密私訊 -->
             <div class="tab-pane fade card-glass p-4" id="panel-pm">
                 <h4 class="mb-3 fw-bold text-success fs-5" style="color: var(--breeze-teal) !important;">🔒 安全加密私訊 (E2EE)</h4>
                 <div class="mb-3">
@@ -134,6 +141,7 @@
                     <button id="btn-send-pm" class="btn btn-breeze px-4">加密發送</button>
                 </div>
             </div>
+            <!-- 金鑰管理 -->
             <div class="tab-pane fade card-glass p-4" id="panel-key">
                 <h4 class="text-danger mb-3 fw-bold fs-5">⚠️ 私密金鑰安全保管警告</h4>
                 <div id="backup-private-key" class="secret-key p-3 rounded-3 mb-3"></div>
@@ -146,12 +154,13 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, getDocs, collection, query, where, addDoc, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getDatabase, ref, set, get, push, onValue, query as dbQuery, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // Firebase 配置
     const firebaseConfig = {
         apiKey: "AIzaSyBMxdzzFR7wuocXEMOYciw2PPJleuRevOw",
         authDomain: "weifengai-ef11f.firebaseapp.com",
+        databaseURL: "https://weifengai-ef11f-default-rtdb.firebaseio.com",
         projectId: "weifengai-ef11f",
         storageBucket: "weifengai-ef11f.firebasestorage.app",
         messagingSenderId: "474059699642",
@@ -160,7 +169,7 @@
     };
     const GEMINI_API_KEY = "AIzaSyATX9erM04VfUR_N0io0hwA51XA9IiYf4s";
 
-    // 🛠️ 【已為您自動填入 EmailJS 金鑰資訊】 
+    // EmailJS 金鑰
     const EMAILJS_PUBLIC_KEY = "yfj2SpO34fRfr2rYa"; 
     const EMAILJS_SERVICE_ID = "service_7qmo2uh";
     const EMAILJS_TEMPLATE_ID = "contact_form";
@@ -169,7 +178,7 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getDatabase(app);
 
     let localPrivateKey = "";
     let currentUserUid = "";
@@ -191,6 +200,11 @@
     function showAlert(msg, type="info") { alertBox.className = `alert alert-${type} text-center card-glass py-3 fw-medium`; alertBox.innerText = msg; alertBox.classList.remove('hidden'); }
     function hideAlert() { alertBox.classList.add('hidden'); }
 
+    // Realtime Database不支援點號(.)，這裡做一個安全置換編碼
+    function escapeEmail(email) {
+        return email.replace(/\./g, '_');
+    }
+
     // 驗證與註冊分流
     btnSubmitAuth.addEventListener('click', async () => {
         const email = document.getElementById('auth-email').value.trim();
@@ -202,8 +216,8 @@
                 btnSubmitAuth.disabled = true;
                 // 1. 生成 6 位數驗證碼
                 const code = Math.floor(100000 + Math.random() * 900000).toString();
-                // 2. 暫存寫入 Firestore 待驗證
-                await setDoc(doc(db, "verification_codes", email), { code: code, timestamp: Date.now() });
+                // 2. 寫入 Realtime Database 暫存
+                await set(ref(db, "verification_codes/" + escapeEmail(email)), { code: code, timestamp: Date.now() });
                 // 3. 發送郵件
                 await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: email, verification_code: code });
                 
@@ -232,9 +246,10 @@
         const inputCode = document.getElementById('input-verify-code').value.trim();
         if(inputCode.length !== 6) { alert("請輸入完整的 6 位數驗證碼。"); return; }
 
-        const codeDoc = await getDoc(doc(db, "verification_codes", tempRegEmail));
-        if (codeDoc.exists() && codeDoc.data().code === inputCode) {
-            try {
+        try {
+            const codeRef = ref(db, "verification_codes/" + escapeEmail(tempRegEmail));
+            const snapshot = await get(codeRef);
+            if (snapshot.exists() && snapshot.val().code === inputCode) {
                 // 驗證碼正確，正式在 Firebase 建立帳號
                 const userCred = await createUserWithEmailAndPassword(auth, tempRegEmail, tempRegPassword);
                 const user = userCred.user;
@@ -244,14 +259,16 @@
                 crypt.getKey();
                 localPrivateKey = crypt.getPrivateKey();
                 
-                await setDoc(doc(db, "users", user.uid), { email: user.email, public_key: crypt.getPublicKey() });
+                await set(ref(db, "users/" + user.uid), { email: user.email, public_key: crypt.getPublicKey() });
                 verifySection.classList.add('hidden');
                 hideAlert();
                 enterMain(user.uid, user.email);
                 alert("🎉 驗證成功！已成功開通並為您建立端到端加密金鑰。");
-            } catch(e) { alert("建立帳號失敗: " + e.message); }
-        } else {
-            alert("❌ 驗證碼錯誤，請重新確認郵件！");
+            } else {
+                alert("❌ 驗證碼錯誤，請重新確認郵件！");
+            }
+        } catch(e) {
+            alert("驗證處理失敗: " + e.message);
         }
     });
 
@@ -284,19 +301,24 @@
 
     // ================= 公開群組聊天室 =================
     function startGroupChatListener() {
-        const q = query(collection(db, "group_messages"), orderBy("timestamp", "asc"));
-        onSnapshot(q, (snapshot) => {
+        const groupRef = ref(db, "group_messages");
+        onValue(groupRef, (snapshot) => {
             const box = document.getElementById('chat-group-box'); box.innerHTML = "";
-            snapshot.forEach((doc) => {
-                const data = doc.data(); const isMe = data.sender === currentUserEmail;
-                box.innerHTML += `<div class="msg-item ${isMe ? 'msg-out' : 'msg-in'}"><small class="text-secondary d-block mb-1" style="font-size:11px;">${data.sender}</small>${data.text}</div>`;
-            });
-            box.scrollTop = box.scrollHeight;
+            if (snapshot.exists()) {
+                snapshot.forEach((childSnapshot) => {
+                    const data = childSnapshot.val(); const isMe = data.sender === currentUserEmail;
+                    box.innerHTML += `<div class="msg-item ${isMe ? 'msg-out' : 'msg-in'}"><small class="text-secondary d-block mb-1" style="font-size:11px;">${data.sender}</small>${data.text}</div>`;
+                });
+                box.scrollTop = box.scrollHeight;
+            }
         });
     }
     document.getElementById('btn-send-group').addEventListener('click', async () => {
         const input = document.getElementById('input-group-msg'); const text = input.value.trim(); if (!text) return;
-        await addDoc(collection(db, "group_messages"), { sender: currentUserEmail, text: text, timestamp: Date.now() }); input.value = "";
+        const groupRef = ref(db, "group_messages");
+        const newMsgRef = push(groupRef);
+        await set(newMsgRef, { sender: currentUserEmail, text: text, timestamp: Date.now() }); 
+        input.value = "";
     });
 
     // ================= 加解密邏輯 =================
@@ -319,30 +341,49 @@
     function escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
     function startPMChatListener() {
-        const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
-        onSnapshot(q, (snapshot) => {
+        const pmRef = ref(db, "messages");
+        onValue(pmRef, (snapshot) => {
             const box = document.getElementById('chat-pm-box'); box.innerHTML = "";
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.sender_email === currentUserEmail || data.receiver_uid === currentUserUid) {
-                    const isMe = data.sender_email === currentUserEmail; let displayMsg = "";
-                    try {
-                        let decrypted = decryptMessage(data.encrypted_text, localPrivateKey);
-                        displayMsg = isMe ? `🔒 (經加密送出) <br> <span class="text-light" style="font-size:12px; opacity:0.55;">原始明文：${escapeHtml(decrypted)}</span>` : escapeHtml(decrypted);
-                    } catch(e) { displayMsg = "<span class='text-danger' style='font-size:13px;'>❌ 無法解密 (請提供正確私鑰)</span>"; }
-                    box.innerHTML += `<div class="msg-item ${isMe ? 'msg-out' : 'msg-in'}"><small class="text-secondary d-block mb-1" style="font-size:10px;">${data.sender_email}</small>${displayMsg}</div>`;
-                }
-            });
-            box.scrollTop = box.scrollHeight;
+            if (snapshot.exists()) {
+                snapshot.forEach((childSnapshot) => {
+                    const data = childSnapshot.val();
+                    if (data.sender_email === currentUserEmail || data.receiver_uid === currentUserUid) {
+                        const isMe = data.sender_email === currentUserEmail; let displayMsg = "";
+                        try {
+                            let decrypted = decryptMessage(data.encrypted_text, localPrivateKey);
+                            displayMsg = isMe ? `🔒 (經加密送出) <br> <span class="text-light" style="font-size:12px; opacity:0.55;">原始明文：${escapeHtml(decrypted)}</span>` : escapeHtml(decrypted);
+                        } catch(e) { displayMsg = "<span class='text-danger' style='font-size:13px;'>❌ 無法解密 (請提供正確私鑰)</span>"; }
+                        box.innerHTML += `<div class="msg-item ${isMe ? 'msg-out' : 'msg-in'}"><small class="text-secondary d-block mb-1" style="font-size:10px;">${data.sender_email}</small>${displayMsg}</div>`;
+                    }
+                });
+                box.scrollTop = box.scrollHeight;
+            }
         });
     }
     document.getElementById('btn-send-pm').addEventListener('click', async () => {
         const targetEmail = document.getElementById('pm-target-email').value.trim(); const input = document.getElementById('input-pm-msg'); const text = input.value.trim(); if (!targetEmail || !text) return;
-        const q = query(collection(db, "users"), where("email", "==", targetEmail)); const snapshot = await getDocs(q);
-        let targetUid = null, targetPubKey = null; snapshot.forEach((doc) => { targetUid = doc.id; targetPubKey = doc.data().public_key; });
-        if (!targetPubKey) { alert("找不到目標對象的加密公鑰！"); return; }
-        const encPack = encryptMessage(text, targetPubKey);
-        await addDoc(collection(db, "messages"), { sender_email: currentUserEmail, receiver_uid: targetUid, encrypted_text: encPack, timestamp: Date.now() }); input.value = "";
+        try {
+            const usersRef = ref(db, "users");
+            const emailQuery = dbQuery(usersRef, orderByChild("email"), equalTo(targetEmail));
+            const snapshot = await get(emailQuery);
+
+            let targetUid = null, targetPubKey = null;
+            if (snapshot.exists()) {
+                snapshot.forEach((childSnapshot) => {
+                    targetUid = childSnapshot.key;
+                    targetPubKey = childSnapshot.val().public_key;
+                });
+            }
+
+            if (!targetPubKey) { alert("找不到目標對象的加密公鑰！"); return; }
+            const encPack = encryptMessage(text, targetPubKey);
+            const pmRef = ref(db, "messages");
+            const newPmRef = push(pmRef);
+            await set(newPmRef, { sender_email: currentUserEmail, receiver_uid: targetUid, encrypted_text: encPack, timestamp: Date.now() }); 
+            input.value = "";
+        } catch(e) {
+            alert("發送失敗: " + e.message);
+        }
     });
     document.getElementById('btn-download-key').addEventListener('click', () => {
         const blob = new Blob([localPrivateKey], { type: "text/plain;charset=utf-8" }); const url = URL.createObjectURL(blob);
