@@ -3,89 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>微風Chat - 端到端加密即時聊天</title>
+    <title>微風Chat</title>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); margin: 0; padding: 0; color: #333; }
-        .container { max-width: 900px; margin: 20px auto; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; }
-        .header { background: #4a6bdf; color: white; padding: 15px; text-align: center; }
-        .login-panel, .chat-panel { padding: 20px; }
-        input, button, textarea { margin: 8px 0; padding: 10px; border-radius: 8px; border: 1px solid #ddd; width: 100%; }
-        button { background: #4a6bdf; color: white; cursor: pointer; font-weight: bold; }
-        button:hover { background: #3a5ac0; }
-        .message { padding: 12px; margin: 8px 0; border-radius: 10px; max-width: 70%; }
-        .sent { background: #dcf8c6; align-self: flex-end; margin-left: auto; }
-        .received { background: #f1f0f0; }
-        .chat-area { height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 10px; display: flex; flex-direction: column; }
-        .tabs { display: flex; }
-        .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; }
-        .tab.active { background: #4a6bdf; color: white; }
-        .key-display { background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: monospace; word-break: break-all; max-height: 200px; overflow: auto; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #4285f4, #34a853); margin:0; padding:0; height:100vh; display:flex; align-items:center; justify-content:center; }
+        .card { background:white; padding:40px; border-radius:12px; width:380px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; }
+        input { width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
+        .btn { width:100%; padding:12px; margin:10px 0; border:none; border-radius:8px; font-size:16px; cursor:pointer; }
+        .btn-primary { background:#4285f4; color:white; }
+        .btn-secondary { background:#f1f3f4; color:#333; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🌬️ 微風Chat</h1>
-            <p>端到端加密 • AI 助理 • 安全私密</p>
+    <div class="card">
+        <h1>🌬️ 微風Chat</h1>
+        <p>安全加密即時聊天</p>
+
+        <div id="registerStep">
+            <input type="email" id="regEmail" placeholder="電子郵件地址">
+            <input type="password" id="regPassword" placeholder="設定密碼 (至少6位)">
+            <input type="password" id="masterPass" placeholder="主密碼 (保護私鑰)">
+            <button class="btn btn-primary" onclick="sendVerification()">寄送驗證碼</button>
         </div>
 
-        <!-- 登入/註冊面板 -->
-        <div id="loginPanel" class="login-panel">
-            <h2>歡迎使用微風Chat</h2>
-            <div>
-                <button onclick="showRegister()">註冊新帳號</button>
-                <button onclick="showLogin()">登入</button>
-            </div>
-            <div id="authForm">
-                <input type="email" id="email" placeholder="電子郵件">
-                <input type="password" id="password" placeholder="密碼 (至少 6 碼)">
-                <button id="authBtn" onclick="handleAuth()">註冊</button>
-            </div>
+        <div id="verifyStep" style="display:none;">
+            <input type="text" id="verifyCode" placeholder="輸入6位數驗證碼" maxlength="6">
+            <button class="btn btn-primary" onclick="verifyAndRegister()">確認驗證碼</button>
         </div>
 
-        <!-- 聊天主面板 -->
-        <div id="chatPanel" class="chat-panel" style="display: none;">
-            <div class="tabs">
-                <div class="tab active" onclick="switchTab(0)">聊天</div>
-                <div class="tab" onclick="switchTab(1)">AI 助理</div>
-                <div class="tab" onclick="switchTab(2)">我的私鑰</div>
-            </div>
-
-            <!-- 聊天 Tab -->
-            <div id="chatTab">
-                <p>已登入: <span id="currentUser"></span></p>
-                <input type="text" id="targetEmail" placeholder="對方 Email">
-                <textarea id="messageInput" rows="3" placeholder="輸入訊息..."></textarea>
-                <button onclick="sendMessage()">🔒 加密發送</button>
-
-                <h3>訊息記錄</h3>
-                <div id="chatArea" class="chat-area"></div>
-                <button onclick="loadMessages()">🔄 重新載入訊息</button>
-            </div>
-
-            <!-- AI Tab -->
-            <div id="aiTab" style="display: none;">
-                <h3>微風 AI 助理</h3>
-                <textarea id="aiPrompt" rows="4" placeholder="問 AI 任何問題..."></textarea>
-                <button onclick="askAI()">🚀 詢問 AI</button>
-                <div id="aiResponse" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; min-height: 100px;"></div>
-            </div>
-
-            <!-- 私鑰 Tab -->
-            <div id="keyTab" style="display: none;">
-                <h3>⚠️ 我的私鑰 (請妥善備份)</h3>
-                <div id="privateKeyDisplay" class="key-display"></div>
-                <button onclick="copyPrivateKey()">複製私鑰</button>
-                <p style="color: red; font-size: 0.9em;">遺失私鑰將無法解密收到的訊息！</p>
-            </div>
-        </div>
+        <p><a href="#" onclick="toggleToLogin()">已有帳號？登入</a></p>
     </div>
 
     <script>
-        // ==================== Firebase 初始化 ====================
         const firebaseConfig = {
           apiKey: "AIzaSyBMxdzzFR7wuocXEMOYciw2PPJleuRevOw",
           authDomain: "weifengai-ef11f.firebaseapp.com",
@@ -93,357 +44,91 @@
           projectId: "weifengai-ef11f",
           storageBucket: "weifengai-ef11f.firebasestorage.app",
           messagingSenderId: "474059699642",
-          appId: "1:474059699642:web:b40a3d32be1cd583199983",
-          measurementId: "G-N1TYXP9EWQ"
+          appId: "1:474059699642:web:b40a3d32be1cd583199983"
         };
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.database();
 
-        // ==================== 加密核心 (Web Crypto API) ====================
-        let currentUser = null;
-        let localPrivateKey = null; // CryptoKey 物件
-        let localPrivateKeyPEM = null; // 用於顯示/備份
+        // === Mailjet 金鑰 ===
+        const MAILJET_API_KEY = "5d0a3c80279acbe7a4ca24543229c99b";
+        const MAILJET_SECRET_KEY = "aee77c713995752689aa19a1ee05efe7";
 
-        async function generateKeys() {
-            try {
-                const keyPair = await crypto.subtle.generateKey(
-                    {
-                        name: "RSA-OAEP",
-                        modulusLength: 2048,
-                        publicExponent: new Uint8Array([1, 0, 1]),
-                        hash: "SHA-256"
-                    },
-                    true,
-                    ["encrypt", "decrypt"]
-                );
+        async function sendVerification() {
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const masterPass = document.getElementById('masterPass').value.trim();
 
-                // 匯出 PEM 格式
-                const publicKey = await crypto.subtle.exportKey("spki", keyPair.publicKey);
-                const privateKey = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-
-                const publicPEM = `-----BEGIN PUBLIC KEY-----\n${arrayBufferToBase64(publicKey)}\n-----END PUBLIC KEY-----`;
-                const privatePEM = `-----BEGIN PRIVATE KEY-----\n${arrayBufferToBase64(privateKey)}\n-----END PRIVATE KEY-----`;
-
-                localPrivateKey = keyPair.privateKey;
-                localPrivateKeyPEM = privatePEM;
-
-                return { publicPEM, privatePEM };
-            } catch (e) {
-                console.error("金鑰生成失敗", e);
-                alert("金鑰生成失敗");
-                throw e;
+            if (!email || password.length < 6 || masterPass.length < 4) {
+                return alert("請填寫完整資訊");
             }
-        }
 
-        function arrayBufferToBase64(buffer) {
-            let binary = '';
-            const bytes = new Uint8Array(buffer);
-            for (let i = 0; i < bytes.byteLength; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return btoa(binary);
-        }
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-        async function importPublicKey(pem) {
-            const binaryDer = base64ToArrayBuffer(pem.replace(/-----[\w\s]+-----/g, '').trim());
-            return await crypto.subtle.importKey(
-                "spki",
-                binaryDer,
-                { name: "RSA-OAEP", hash: "SHA-256" },
-                true,
-                ["encrypt"]
-            );
-        }
-
-        function base64ToArrayBuffer(base64) {
-            const binary = atob(base64);
-            const buffer = new ArrayBuffer(binary.length);
-            const bytes = new Uint8Array(buffer);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            return buffer;
-        }
-
-        // 混合加密
-        async function encryptMessage(message, receiverPublicPEM) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(message);
-
-            // 生成 AES 金鑰
-            const aesKey = await crypto.subtle.generateKey(
-                { name: "AES-GCM", length: 256 },
-                true,
-                ["encrypt"]
-            );
-
-            const iv = crypto.getRandomValues(new Uint8Array(12));
-
-            const encryptedData = await crypto.subtle.encrypt(
-                { name: "AES-GCM", iv },
-                aesKey,
-                data
-            );
-
-            // 用 RSA 加密 AES 金鑰
-            const pubKey = await importPublicKey(receiverPublicPEM);
-            const exportedAesKey = await crypto.subtle.exportKey("raw", aesKey);
-            const encryptedAesKey = await crypto.subtle.encrypt(
-                { name: "RSA-OAEP" },
-                pubKey,
-                exportedAesKey
-            );
-
-            // 合併：iv + encryptedAesKey + encryptedData
-            const combined = new Uint8Array(iv.length + encryptedAesKey.byteLength + encryptedData.byteLength);
-            combined.set(iv, 0);
-            combined.set(new Uint8Array(encryptedAesKey), iv.length);
-            combined.set(new Uint8Array(encryptedData), iv.length + encryptedAesKey.byteLength);
-
-            return btoa(String.fromCharCode(...combined));
-        }
-
-        // 解密
-        async function decryptMessage(encryptedBase64) {
-            if (!localPrivateKey) throw new Error("缺少私鑰");
-
-            const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
-
-            const iv = combined.slice(0, 12);
-            const encryptedAesKey = combined.slice(12, 12 + 256); // RSA 加密後 AES key 大小大約 256 bytes
-            const encryptedData = combined.slice(12 + 256);
-
-            // 解密 AES key
-            const aesKeyRaw = await crypto.subtle.decrypt(
-                { name: "RSA-OAEP" },
-                localPrivateKey,
-                encryptedAesKey
-            );
-
-            const aesKey = await crypto.subtle.importKey(
-                "raw",
-                aesKeyRaw,
-                { name: "AES-GCM" },
-                false,
-                ["decrypt"]
-            );
-
-            const decryptedData = await crypto.subtle.decrypt(
-                { name: "AES-GCM", iv },
-                aesKey,
-                encryptedData
-            );
-
-            const decoder = new TextDecoder();
-            return decoder.decode(decryptedData);
-        }
-
-        // ==================== Firebase 操作 ====================
-        async function registerUser(email, password) {
-            try {
-                const { publicPEM } = await generateKeys();
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const uid = userCredential.user.uid;
-
-                await db.ref('users/' + uid).set({
-                    email: email,
-                    public_key: publicPEM,
-                    createdAt: Date.now()
-                });
-
-                localPrivateKeyPEM = (await generateKeys()).privatePEM; // 確保有 PEM
-                alert("註冊成功！請妥善保存您的私鑰。");
-                return userCredential.user;
-            } catch (e) {
-                alert("註冊失敗: " + e.message);
-                throw e;
-            }
-        }
-
-        async function loginUser(email, password) {
-            try {
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                currentUser = userCredential.user;
-
-                // 載入用戶公鑰 (顯示私鑰需手動貼上或從本地)
-                const snapshot = await db.ref('users/' + currentUser.uid).once('value');
-                const userData = snapshot.val();
-
-                document.getElementById('currentUser').textContent = email;
-                document.getElementById('loginPanel').style.display = 'none';
-                document.getElementById('chatPanel').style.display = 'block';
-
-                // 提示貼上私鑰
-                const privatePEMInput = prompt("請貼上您的私鑰 (PEM 格式) 以解密訊息：");
-                if (privatePEMInput) {
-                    // 簡化：這裡實際上我們用 Web Crypto import，但為了簡化 demo 我們假設已設定
-                    alert("私鑰已載入 (模擬)");
-                    localPrivateKeyPEM = privatePEMInput;
-                }
-                loadMessages();
-            } catch (e) {
-                alert("登入失敗: " + e.message);
-            }
-        }
-
-        async function sendMessage() {
-            const targetEmail = document.getElementById('targetEmail').value.trim();
-            const msg = document.getElementById('messageInput').value.trim();
-            if (!targetEmail || !msg) return alert("請填寫完整");
-
-            try {
-                // 查詢對方公鑰
-                let targetUid = null;
-                let targetPublicKey = null;
-
-                const usersSnap = await db.ref('users').once('value');
-                usersSnap.forEach(child => {
-                    if (child.val().email === targetEmail) {
-                        targetUid = child.key;
-                        targetPublicKey = child.val().public_key;
-                    }
-                });
-
-                if (!targetPublicKey) return alert("找不到對方公鑰");
-
-                const encrypted = await encryptMessage(msg, targetPublicKey);
-
-                await db.ref('messages').push({
-                    senderUid: currentUser.uid,
-                    senderEmail: currentUser.email,
-                    receiverUid: targetUid,
-                    encryptedText: encrypted,
-                    timestamp: Date.now()
-                });
-
-                alert("訊息已加密發送！");
-                document.getElementById('messageInput').value = '';
-            } catch (e) {
-                console.error(e);
-                alert("發送失敗: " + e.message);
-            }
-        }
-
-        async function loadMessages() {
-            const chatArea = document.getElementById('chatArea');
-            chatArea.innerHTML = '<p>載入中...</p>';
-
-            const messagesSnap = await db.ref('messages').once('value');
-            chatArea.innerHTML = '';
-
-            messagesSnap.forEach(child => {
-                const msg = child.val();
-                if (msg.receiverUid === currentUser.uid) {
-                    const div = document.createElement('div');
-                    div.className = 'message received';
-                    div.innerHTML = `<strong>來自 ${msg.senderEmail}:</strong><br>`;
-
-                    try {
-                        // 解密
-                        decryptMessage(msg.encryptedText).then(decrypted => {
-                            div.innerHTML += decrypted;
-                        }).catch(() => {
-                            div.innerHTML += "[解密失敗 - 私鑰不符]";
-                        });
-                    } catch (e) {
-                        div.innerHTML += "[解密失敗]";
-                    }
-                    chatArea.appendChild(div);
-                }
+            // 存到 Firebase
+            await db.ref('verification/' + btoa(email)).set({
+                code: code,
+                password: password,
+                masterPass: masterPass,
+                expires: Date.now() + 600000
             });
-        }
 
-        // ==================== AI 功能 ====================
-        const GEMINI_API_KEY = "AIzaSyATX9erM04VfUR_N0io0hwA51XA9IiYf4s";
-
-        async function askAI() {
-            const prompt = document.getElementById('aiPrompt').value.trim();
-            if (!prompt) return;
-
-            const responseDiv = document.getElementById('aiResponse');
-            responseDiv.textContent = "思考中...";
-
+            // 寄信
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch("https://api.mailjet.com/v3.1/send", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Basic " + btoa(MAILJET_API_KEY + ":" + MAILJET_SECRET_KEY)
+                    },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
+                        "Messages": [{
+                            "From": { "Email": "noreply@weifengchat.com", "Name": "微風Chat" },
+                            "To": [{ "Email": email }],
+                            "Subject": "🌬️ 微風Chat 驗證碼",
+                            "HTMLPart": `<h2>您的驗證碼是 <strong>${code}</strong></h2><p>10分鐘內有效</p>`
+                        }]
                     })
                 });
 
-                const data = await res.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "無回應";
-                responseDiv.textContent = text;
-            } catch (e) {
-                responseDiv.textContent = "AI 請求失敗: " + e.message;
-            }
-        }
-
-        // ==================== UI 控制 ====================
-        function showRegister() {
-            document.getElementById('authBtn').textContent = '註冊';
-            document.getElementById('authBtn').onclick = () => {
-                const email = document.getElementById('email').value;
-                const pass = document.getElementById('password').value;
-                registerUser(email, pass);
-            };
-        }
-
-        function showLogin() {
-            document.getElementById('authBtn').textContent = '登入';
-            document.getElementById('authBtn').onclick = () => {
-                const email = document.getElementById('email').value;
-                const pass = document.getElementById('password').value;
-                loginUser(email, pass);
-            };
-        }
-
-        function handleAuth() {
-            // 依按鈕文字處理
-            console.log("使用 showRegister 或 showLogin");
-        }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach((t, i) => {
-                t.classList.toggle('active', i === tab);
-            });
-            document.getElementById('chatTab').style.display = tab === 0 ? 'block' : 'none';
-            document.getElementById('aiTab').style.display = tab === 1 ? 'block' : 'none';
-            document.getElementById('keyTab').style.display = tab === 2 ? 'block' : 'none';
-
-            if (tab === 2 && localPrivateKeyPEM) {
-                document.getElementById('privateKeyDisplay').textContent = localPrivateKeyPEM;
-            }
-        }
-
-        function copyPrivateKey() {
-            if (!localPrivateKeyPEM) return alert("無私鑰");
-            navigator.clipboard.writeText(localPrivateKeyPEM).then(() => alert("已複製！"));
-        }
-
-        // 即時監聽新訊息
-        function setupRealtimeListener() {
-            db.ref('messages').on('child_added', (snapshot) => {
-                if (currentUser) loadMessages();
-            });
-        }
-
-        // 初始化
-        window.onload = () => {
-            auth.onAuthStateChanged(user => {
-                if (user) {
-                    currentUser = user;
-                    document.getElementById('loginPanel').style.display = 'none';
-                    document.getElementById('chatPanel').style.display = 'block';
-                    document.getElementById('currentUser').textContent = user.email;
-                    setupRealtimeListener();
-                    loadMessages();
+                if (res.ok) {
+                    alert(`驗證碼已寄至 ${email}！請查看信箱（含垃圾信）`);
+                    document.getElementById('registerStep').style.display = 'none';
+                    document.getElementById('verifyStep').style.display = 'block';
+                } else {
+                    alert("寄信失敗，請稍後再試");
                 }
-            });
-        };
+            } catch (e) {
+                alert("寄信錯誤：" + e.message);
+            }
+        }
+
+        async function verifyAndRegister() {
+            const email = document.getElementById('regEmail').value.trim();
+            const inputCode = document.getElementById('verifyCode').value.trim();
+
+            const snap = await db.ref('verification/' + btoa(email)).once('value');
+            const data = snap.val();
+
+            if (!data || data.code !== inputCode || Date.now() > data.expires) {
+                return alert("驗證碼錯誤或已過期");
+            }
+
+            try {
+                const cred = await auth.createUserWithEmailAndPassword(email, data.password);
+                await cred.user.sendEmailVerification();
+
+                alert("✅ 註冊成功！請登入後使用主密碼解鎖私鑰。");
+                // 可在此繼續開發登入流程
+            } catch (e) {
+                alert("註冊失敗: " + e.message);
+            }
+        }
+
+        function toggleToLogin() {
+            alert("登入功能開發中...（可先用註冊測試）");
+        }
     </script>
 </body>
 </html>
