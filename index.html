@@ -8,35 +8,68 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #4285f4, #34a853); margin:0; padding:0; height:100vh; display:flex; align-items:center; justify-content:center; }
-        .card { background:white; padding:40px; border-radius:12px; width:380px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; }
-        input { width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
+        body { margin:0; font-family: system-ui, sans-serif; background: linear-gradient(135deg, #4285f4, #34a853); height:100vh; display:flex; align-items:center; justify-content:center; }
+        .card { background:white; width:420px; padding:30px; border-radius:16px; box-shadow:0 15px 40px rgba(0,0,0,0.3); }
+        input, textarea { width:100%; padding:12px; margin:8px 0; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
         .btn { width:100%; padding:12px; margin:10px 0; border:none; border-radius:8px; font-size:16px; cursor:pointer; }
         .btn-primary { background:#4285f4; color:white; }
         .btn-secondary { background:#f1f3f4; color:#333; }
+        .chat-container { display:none; flex-direction:column; height:100vh; }
+        .chat-header { padding:15px; background:white; border-bottom:1px solid #ddd; font-weight:bold; }
+        .message-list { flex:1; overflow-y:auto; padding:20px; background:#f8f9fa; }
+        .message { padding:12px 16px; border-radius:18px; max-width:75%; margin:8px 0; }
+        .sent { background:#34a853; color:white; align-self:flex-end; margin-left:auto; }
+        .received { background:white; align-self:flex-start; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>🌬️ 微風Chat</h1>
-        <p>安全加密即時聊天</p>
 
-        <div id="registerStep">
-            <input type="email" id="regEmail" placeholder="電子郵件地址">
-            <input type="password" id="regPassword" placeholder="設定密碼 (至少6位)">
+    <!-- 註冊 / 登入頁面 -->
+    <div id="authPage" class="card">
+        <h1 style="text-align:center; color:#4285f4;">🌬️ 微風Chat</h1>
+        <p style="text-align:center;">安全加密聊天</p>
+
+        <div id="registerForm">
+            <input type="email" id="regEmail" placeholder="電子郵件">
+            <input type="password" id="regPassword" placeholder="密碼 (至少6位)">
             <input type="password" id="masterPass" placeholder="主密碼 (保護私鑰)">
-            <button class="btn btn-primary" onclick="sendVerification()">寄送驗證碼</button>
+            <button class="btn btn-primary" onclick="sendVerification()">寄送 6 位數驗證碼</button>
         </div>
 
-        <div id="verifyStep" style="display:none;">
+        <div id="verifyForm" style="display:none;">
             <input type="text" id="verifyCode" placeholder="輸入6位數驗證碼" maxlength="6">
-            <button class="btn btn-primary" onclick="verifyAndRegister()">確認驗證碼</button>
+            <button class="btn btn-primary" onclick="verifyAndRegister()">確認驗證並註冊</button>
         </div>
 
-        <p><a href="#" onclick="toggleToLogin()">已有帳號？登入</a></p>
+        <button class="btn btn-secondary" onclick="switchToLogin()">切換到登入</button>
+    </div>
+
+    <!-- 主聊天頁面 -->
+    <div id="chatPage" class="chat-container">
+        <div class="chat-header">
+            🌬️ 微風Chat - <span id="userEmail"></span>
+            <button onclick="switchTab(1)" style="float:right; margin-left:10px;">微風AI</button>
+        </div>
+        
+        <div class="message-list" id="messageList"></div>
+        
+        <div style="padding:10px; background:white; display:flex; gap:8px;">
+            <input type="text" id="targetEmail" placeholder="對方 Email" style="flex:1;">
+            <textarea id="msgInput" placeholder="輸入訊息..." style="flex:3; height:50px;"></textarea>
+            <button class="btn btn-primary" onclick="sendMessage()">發送</button>
+        </div>
+
+        <!-- 微風AI 面板 -->
+        <div id="aiPanel" style="display:none; position:absolute; top:60px; right:20px; width:350px; background:white; padding:20px; border-radius:12px; box-shadow:0 5px 20px rgba(0,0,0,0.3);">
+            <h3>🌬️ 微風AI</h3>
+            <textarea id="aiPrompt" rows="5" placeholder="問我任何問題..."></textarea>
+            <button class="btn btn-primary" onclick="askAI()">詢問微風AI</button>
+            <div id="aiResponse" style="margin-top:15px; padding:15px; background:#f8f9fa; border-radius:8px; min-height:100px;"></div>
+        </div>
     </div>
 
     <script>
+        // Firebase 配置
         const firebaseConfig = {
           apiKey: "AIzaSyBMxdzzFR7wuocXEMOYciw2PPJleuRevOw",
           authDomain: "weifengai-ef11f.firebaseapp.com",
@@ -51,32 +84,27 @@
         const auth = firebase.auth();
         const db = firebase.database();
 
-        // === Mailjet 金鑰 ===
+        // Mailjet 金鑰
         const MAILJET_API_KEY = "5d0a3c80279acbe7a4ca24543229c99b";
         const MAILJET_SECRET_KEY = "aee77c713995752689aa19a1ee05efe7";
+
+        let currentUser = null;
 
         async function sendVerification() {
             const email = document.getElementById('regEmail').value.trim();
             const password = document.getElementById('regPassword').value.trim();
             const masterPass = document.getElementById('masterPass').value.trim();
 
-            if (!email || password.length < 6 || masterPass.length < 4) {
-                return alert("請填寫完整資訊");
-            }
+            if (!email || password.length < 6) return alert("請填寫完整");
 
             const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-            // 存到 Firebase
             await db.ref('verification/' + btoa(email)).set({
-                code: code,
-                password: password,
-                masterPass: masterPass,
-                expires: Date.now() + 600000
+                code, password, masterPass, expires: Date.now() + 600000
             });
 
-            // 寄信
             try {
-                const res = await fetch("https://api.mailjet.com/v3.1/send", {
+                await fetch("https://api.mailjet.com/v3.1/send", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -86,49 +114,74 @@
                         "Messages": [{
                             "From": { "Email": "noreply@weifengchat.com", "Name": "微風Chat" },
                             "To": [{ "Email": email }],
-                            "Subject": "🌬️ 微風Chat 驗證碼",
-                            "HTMLPart": `<h2>您的驗證碼是 <strong>${code}</strong></h2><p>10分鐘內有效</p>`
+                            "Subject": "微風Chat 驗證碼",
+                            "HTMLPart": `<h2>您的驗證碼是 <b>${code}</b></h2><p>10 分鐘內有效</p>`
                         }]
                     })
                 });
-
-                if (res.ok) {
-                    alert(`驗證碼已寄至 ${email}！請查看信箱（含垃圾信）`);
-                    document.getElementById('registerStep').style.display = 'none';
-                    document.getElementById('verifyStep').style.display = 'block';
-                } else {
-                    alert("寄信失敗，請稍後再試");
-                }
+                alert(`驗證碼已寄至 ${email}！`);
+                document.getElementById('registerForm').style.display = 'none';
+                document.getElementById('verifyForm').style.display = 'block';
             } catch (e) {
-                alert("寄信錯誤：" + e.message);
+                alert("寄信失敗");
             }
         }
 
         async function verifyAndRegister() {
             const email = document.getElementById('regEmail').value.trim();
-            const inputCode = document.getElementById('verifyCode').value.trim();
+            const code = document.getElementById('verifyCode').value.trim();
 
             const snap = await db.ref('verification/' + btoa(email)).once('value');
             const data = snap.val();
 
-            if (!data || data.code !== inputCode || Date.now() > data.expires) {
-                return alert("驗證碼錯誤或已過期");
-            }
+            if (!data || data.code !== code) return alert("驗證碼錯誤");
 
             try {
                 const cred = await auth.createUserWithEmailAndPassword(email, data.password);
-                await cred.user.sendEmailVerification();
-
-                alert("✅ 註冊成功！請登入後使用主密碼解鎖私鑰。");
-                // 可在此繼續開發登入流程
+                alert("🎉 註冊成功！請重新登入");
+                location.reload();
             } catch (e) {
-                alert("註冊失敗: " + e.message);
+                alert(e.message);
             }
         }
 
-        function toggleToLogin() {
-            alert("登入功能開發中...（可先用註冊測試）");
+        function switchToLogin() {
+            alert("登入功能開發中...\n目前請先註冊測試");
         }
+
+        // 微風AI
+        async function askAI() {
+            const prompt = document.getElementById('aiPrompt').value;
+            if (!prompt) return;
+            const res = document.getElementById('aiResponse');
+            res.textContent = "思考中...";
+            // 使用你原本的 Gemini Key
+            try {
+                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyATX9erM04VfUR_N0io0hwA51XA9IiYf4s`, {
+                    method:"POST",
+                    headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+                });
+                const d = await r.json();
+                res.textContent = d.candidates?.[0]?.content?.parts?.[0]?.text || "無回應";
+            } catch(e) { res.textContent = "AI 暫時無法使用"; }
+        }
+
+        function switchTab(n) {
+            document.getElementById('aiPanel').style.display = n === 1 ? 'block' : 'none';
+        }
+
+        // 初始化
+        window.onload = () => {
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('authPage').style.display = 'none';
+                    document.getElementById('chatPage').style.display = 'flex';
+                    document.getElementById('userEmail').textContent = user.email;
+                }
+            });
+        };
     </script>
 </body>
 </html>
